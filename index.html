@@ -1,10 +1,22 @@
 <!DOCTYPE html>
 <html>
 	<head>
+		<!-- Global site tag (gtag.js) - Google Analytics -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=UA-164327276-1"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+
+  gtag('config', 'UA-164327276-1');
+</script>
+
 	</head>
 	<body>
 		<input type="file" id="files" name="files[]" />
-		<output id="list"></output>
+			<div>
+				<textarea readonly="readonly" id="output" style="width: 95%;height:95%;position:absolute"></textArea>
+			</div>
 	</body>
 	<script src="index.js" lang="javascript"></script>
 </html>

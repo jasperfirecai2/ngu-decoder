@@ -381,12 +381,11 @@ function handleFileSelect(evt) {
 		reader.onload = (function (theFile) {
 			return function (e) {
 				const t = atob(e.target.result)
-				const pre = document.createElement('pre');
 				const data = deserialize(t);
 				const playerData = atob(data.playerData)
 				const decodedPlayerData = deserialize(playerData);
-				pre.innerText = JSON.stringify(decodedPlayerData, null, 2);
-				document.getElementById('list').insertBefore(pre, null);
+				const textArea = document.getElementById('output')
+				textArea.value = JSON.stringify(decodedPlayerData, null, 2);
 			};
 		})(f);
 
