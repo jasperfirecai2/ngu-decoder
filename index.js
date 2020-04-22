@@ -87,9 +87,7 @@ function deserializeBinaryObjectString(reader) {
 }
 
 function deserializeMemberReference(reader) {
-	return {
-		idRef: reader.read32()
-	};
+	return reader.read32();
 }
 
 function deserializePrimitiveType(reader, type) {
@@ -115,7 +113,10 @@ function deserializePrimitiveType(reader, type) {
 		case 9: // int64
 			return reader.read64();
 		case 10: // sbyte
-			return reader.read8(); // TODO: This isn't right.
+			const val = reader.read7();
+			const negative = reader.read1();
+			if (negative) val = -128 + val;
+			return val;
 		case 11: // single
 			return reader.readSingle();
 		case 12: // timespan
@@ -135,6 +136,7 @@ function deserializePrimitiveType(reader, type) {
 	}
 }
 
+// TODO: Refactor
 function deserializeClassValues(reader, cls, state) {
 	const memberValues = [];
 	for (let i in cls.memberTypes) {
@@ -176,7 +178,8 @@ function deserializeClassValues(reader, cls, state) {
 						break;
 					case 0x09: // MemberReference
 						const reference = deserializeMemberReference(reader);
-						memberValues.push({ref: reference})
+						state.references.push(() => memberValues[i] = state.objects[reference]);
+						memberValues.push({ref: reference});
 						break;
 					default:
 						throw "not implemented";
@@ -193,6 +196,7 @@ function deserializeClassValues(reader, cls, state) {
 				switch (recordType7) {
 					case 0x09: // MemberReference
 						const ref7 = deserializeMemberReference(reader);
+						state.references.push(() => memberValues[i] = state.objects[ref7]);
 						memberValues.push({ref: ref7});
 						break;
 					default:
@@ -207,7 +211,13 @@ function deserializeClassValues(reader, cls, state) {
 function mapMembers(cls, values) {
 	const members = {};
 	for (const idx in cls.memberNames) {
-		members[cls.memberNames[idx]] = values[idx];
+		if (values[idx] && values[idx].memberNames) {
+			members[cls.memberNames[idx]] = mapMembers(values[idx], values[idx].memberValues);
+		} else if (cls.memberNames[idx] === "_items" || cls.memberNames[idx] === "value__") {
+			return values[idx];
+		} else {
+			members[cls.memberNames[idx]] = values[idx];
+		}
 	}
 	return members;
 }
@@ -216,7 +226,9 @@ function deserialize(str) {
 	const reader = bitReader(str);
 	const state = {
 		libraries: [],
-		objects: {}
+		objects: {},
+		references: [],
+		activeObject: null
 	}
 	const result = {
 	};
@@ -232,12 +244,14 @@ function deserialize(str) {
 				const cls1 = state.objects[metadataId];
 				const values1 = deserializeClassValues(reader, cls1, state);
 				state.objects[cls1.objectId] = cls1;
+				state.activeObject = cls1;
 				break;
 			case 0x04: // SystemClassWithMembersAndTypesRecord
 			case 0x05: // ClassWithMembersAndTypesRecord
 				const cls = deserializeClassWithMembersAndTypes(reader, state, record === 0x04);
 				cls.memberValues = deserializeClassValues(reader, cls, state);
 				state.objects[cls.objectId] = cls;
+				state.activeObject = cls;
 				break;
 			case 0x07: // BinaryArray
 				const binaryArrayObjectId = reader.read32();
@@ -273,13 +287,17 @@ function deserialize(str) {
 				// TODO: Something with this
 				break;
 			case 0x0B: // MessageEnd
-				result.classes = Object.values(state.objects);
-				for(const c of result.classes) {
-					if (c.memberValues) { // TODO: Hack
-						c.members = mapMembers(c, c.memberValues);
-					}
+			const classes = [];
+				for (const r of state.references) {
+					r();
 				}
-				return result;
+				const c = Object.values(state.objects)[0];
+				return mapMembers(c, c.memberValues);
+				for (const o of Object.values(state.objects)) {
+					if (!o.memberValues) continue; // TODO: Hack
+					classes.push(mapMembers(o, o.memberValues));
+				}
+				return classes;
 			case 0x0C: // BinaryLibraryRecord
 				state.libraries.push(deserializeBinaryLibrary(reader));
 				break;
@@ -296,6 +314,7 @@ function deserialize(str) {
 					array.push(deserializePrimitiveType(reader, type));
 				}
 				state.objects[arrayObjectId] = array;
+				state.activeObject = null;
 				break;
 			default:
 				debugger;
@@ -391,12 +410,12 @@ function handleFileSelect(evt) {
 		reader.onload = (function (theFile) {
 			return function (e) {
 				const t = atob(e.target.result)
-				const div = document.createElement('div');
+				const pre = document.createElement('pre');
 				const data = deserialize(t);
-				const playerData = atob(data.classes[0].members.playerData)
+				const playerData = atob(data.playerData)
 				const decodedPlayerData = deserialize(playerData);
-				div.innerText = JSON.stringify(decodedPlayerData);
-				document.getElementById('list').insertBefore(div, null);
+				pre.innerText = JSON.stringify(decodedPlayerData, null, 2);
+				document.getElementById('list').insertBefore(pre, null);
 			};
 		})(f);
 
