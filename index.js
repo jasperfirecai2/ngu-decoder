@@ -341,7 +341,11 @@ function bitReader(str) {
 		read8: () => read(8),
 		read16: () => read(16),
 		read32: () => read(32),
-		read64: () => read(64),
+		read64: () => {
+			const low = read(32);
+			const high = read(32);
+			return new Long(low,high).toNumber()
+		},
 		readSingle: () => {
 			var buffer = new ArrayBuffer(8);
 			(new Uint32Array(buffer))[0] = read(32);
