@@ -289,7 +289,7 @@ function deserialize(str) {
 				break;
 			default:
 				debugger;
-				throw "unable to deserialize record of type " + record + ".";
+				console.error("unable to deserialize record of type " + record + ".");
 		}
 	}
 }
